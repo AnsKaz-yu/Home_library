@@ -1,0 +1,1 @@
+{"root":["./src/main.tsx","./src/app/router.tsx","./src/lib/mockapi.ts","./src/pages/invitepage.tsx","./src/pages/joinlibrarypage.tsx","./src/pages/librariespage.tsx","./src/pages/librarydetailspage.tsx","./src/pages/loginpage.tsx","./src/pages/readerpage.tsx","./src/pages/registerpage.tsx","./src/types/domain.ts"],"version":"5.9.3"}
