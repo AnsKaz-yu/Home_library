@@ -11,7 +11,8 @@ export function JoinLibraryPage() {
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const library = findLibraryByCode(query);
+    const trimmedQuery = query.trim();
+    const library = findLibraryByCode(trimmedQuery);
 
     if (!library) {
       setResult(null);
@@ -25,21 +26,29 @@ export function JoinLibraryPage() {
 
   function handleJoin() {
     try {
-      const library = joinLibraryByCode(query);
+      const library = joinLibraryByCode(query.trim());
       navigate(`/libraries/${library.id}`);
     } catch (joinError) {
-      setError(joinError instanceof Error ? joinError.message : 'Не удалось присоединиться к библиотеке.');
+      setError(
+        joinError instanceof Error
+          ? joinError.message
+          : 'Не удалось присоединиться к библиотеке.'
+      );
     }
   }
 
   return (
     <section className="stack-large">
       <div className="hero-card">
-        <div>
+        <div className="hero-copy">
           <p className="eyebrow">Поиск библиотеки</p>
           <h2>Присоединение по ID</h2>
-          <p>Для MVP можно искать библиотеку по public ID или по join code, который видит владелец.</p>
+          <p className="hero-text">
+            Найдите библиотеку по public ID или по invite code и присоединитесь к
+            коллекции как читатель.
+          </p>
         </div>
+
         <form className="inline-form" onSubmit={handleSearch}>
           <input
             name="code"
@@ -55,30 +64,47 @@ export function JoinLibraryPage() {
         </form>
       </div>
 
-      <section className="detail-grid">
+      <section className="join-grid">
         <article className="content-card stack">
           <h3>Демо-данные для просмотра</h3>
-          <p className="muted-text">Можно использовать один из подготовленных ID.</p>
+          <p className="muted-text join-muted">
+            Можно использовать один из подготовленных ID.
+          </p>
+
           <div className="badge-row">
-            <span className="role-chip">FANTASY-001</span>
-            <span className="role-chip">KNOWLEDGE-204</span>
-            <span className="role-chip">invite-demo</span>
-          </div>
+  {['FANTASY-001', 'KNOWLEDGE-204', 'invite-demo'].map((code) => (
+    <span
+      key={code}
+      className="role-chip clickable-chip"
+      onClick={() => {
+  setQuery(code);
+  setResult(null);
+  setError('');
+}}
+    >
+      {code}
+    </span>
+  ))}
+</div>
         </article>
 
         <article className="content-card stack">
           <h3>Результат поиска</h3>
+
           {result ? (
-            <>
+            <div className="join-result-card">
               <div className="stack">
-                <strong>{result.name}</strong>
+                <strong className="join-result-title">{result.name}</strong>
                 <p>{result.description}</p>
-                <p className="muted-text">ID: {result.joinCode ?? result.id}</p>
+                <p className="muted-text join-muted">
+                  ID: {result.joinCode ?? result.id}
+                </p>
               </div>
+
               <button className="primary-button" onClick={handleJoin}>
                 Присоединиться как читатель
               </button>
-            </>
+            </div>
           ) : (
             <div className="empty-state">
               <p>{error || 'После поиска здесь появится карточка найденной библиотеки.'}</p>
