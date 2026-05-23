@@ -18,9 +18,11 @@ export interface Library {
   name: string;
   description: string;
   role: Role;
+  ownerId?: string;
   joinCode?: string;
   sourceLibraryId?: string;
 }
+
 
 export interface Book {
   id: string;
@@ -28,6 +30,8 @@ export interface Book {
   title: string;
   author: string;
   progress: number;
+  fileName?: string;
+  fileUrl?: string;
 }
 
 export interface Bookmark {

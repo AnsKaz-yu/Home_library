@@ -10,6 +10,11 @@ interface Store {
   session: Session | null;
 }
 
+export interface SearchResult {
+  book: Book;
+  library: Library | null;
+}
+
 const STORAGE_KEY = 'home-library-store';
 
 const seedStore: Store = {
@@ -27,6 +32,7 @@ const seedStore: Store = {
       name: 'Фантастика',
       description: 'Подборка для вечернего чтения и заметок.',
       role: 'owner',
+      ownerId: 'user-1',
       joinCode: 'FANTASY-001',
     },
     {
@@ -34,6 +40,7 @@ const seedStore: Store = {
       name: 'Нон-фикшн',
       description: 'Книги по продукту, дизайну и управлению знаниями.',
       role: 'owner',
+      ownerId: 'user-1',
       joinCode: 'KNOWLEDGE-204',
     },
   ],
@@ -92,6 +99,7 @@ const seedStore: Store = {
 
 function readStore(): Store {
   const saved = window.localStorage.getItem(STORAGE_KEY);
+
   if (!saved) {
     writeStore(seedStore);
     return seedStore;
@@ -128,17 +136,33 @@ function getSourceLibraryId(store: Store, libraryId: string) {
   return library?.sourceLibraryId ?? library?.id ?? libraryId;
 }
 
-function ensureReaderLibrary(store: Store, libraryId: string, libraryName: string, joinCode?: string) {
-  const existing = store.libraries.find((library) => library.sourceLibraryId === libraryId && library.role === 'reader');
+function ensureReaderLibrary(
+  store: Store,
+  libraryId: string,
+  libraryName: string,
+  joinCode?: string
+) {
+  if (!store.session) {
+    throw new Error('Сессия не найдена.');
+  }
+
+  const existing = store.libraries.find(
+    (library) =>
+      library.sourceLibraryId === libraryId &&
+      library.role === 'reader' &&
+      library.ownerId === store.session?.userId
+  );
+
   if (existing) {
     return existing;
   }
 
-  const readerLibrary = {
-    id: `${libraryId}-reader`,
+  const readerLibrary: Library = {
+    id: `${libraryId}-reader-${store.session.userId}`,
     name: `${libraryName} (читатель)`,
     description: 'Библиотека, подключённая по shared access.',
-    role: 'reader' as const,
+    role: 'reader',
+    ownerId: store.session.userId,
     sourceLibraryId: libraryId,
     joinCode,
   };
@@ -153,13 +177,15 @@ export function getCurrentSession() {
 
 export function register(name: string, email: string, password: string) {
   const store = readStore();
-  const exists = store.users.some((user) => user.email.toLowerCase() === email.toLowerCase());
+  const exists = store.users.some(
+    (user) => user.email.toLowerCase() === email.toLowerCase()
+  );
 
   if (exists) {
     throw new Error('Пользователь с таким email уже существует.');
   }
 
-  const user = {
+  const user: User = {
     id: createId('user'),
     name,
     email,
@@ -172,13 +198,16 @@ export function register(name: string, email: string, password: string) {
     userName: user.name,
     email: user.email,
   };
+
   writeStore(store);
   return store.session;
 }
 
 export function login(email: string, password: string) {
   const store = readStore();
-  const user = store.users.find((item) => item.email === email && item.password === password);
+  const user = store.users.find(
+    (item) => item.email === email && item.password === password
+  );
 
   if (!user) {
     throw new Error('Неверный email или пароль.');
@@ -189,6 +218,7 @@ export function login(email: string, password: string) {
     userName: user.name,
     email: user.email,
   };
+
   writeStore(store);
   return store.session;
 }
@@ -200,16 +230,42 @@ export function logout() {
 }
 
 export function listLibraries() {
-  return readStore().libraries;
+  const store = readStore();
+
+  if (!store.session) {
+    return [];
+  }
+
+  return store.libraries.filter(
+    (library) => library.ownerId === store.session?.userId
+  );
+}
+
+export function listAccessibleLibraries() {
+  const store = readStore();
+
+  if (!store.session) {
+    return [];
+  }
+
+  return store.libraries.filter(
+    (library) => library.ownerId === store.session?.userId
+  );
 }
 
 export function createLibrary(name: string, description: string) {
   const store = readStore();
-  const library = {
+
+  if (!store.session) {
+    throw new Error('Сессия не найдена.');
+  }
+
+  const library: Library = {
     id: createId('library'),
     name,
     description,
-    role: 'owner' as const,
+    role: 'owner',
+    ownerId: store.session.userId,
     joinCode: createJoinCode(name),
   };
 
@@ -219,7 +275,19 @@ export function createLibrary(name: string, description: string) {
 }
 
 export function getLibrary(libraryId: string) {
-  return readStore().libraries.find((library) => library.id === libraryId) ?? null;
+  const store = readStore();
+
+  if (!store.session) {
+    return null;
+  }
+
+  return (
+    store.libraries.find(
+      (library) =>
+        library.id === libraryId &&
+        library.ownerId === store.session?.userId
+    ) ?? null
+  );
 }
 
 export function listBooks(libraryId: string) {
@@ -228,15 +296,24 @@ export function listBooks(libraryId: string) {
   return store.books.filter((book) => book.libraryId === sourceLibraryId);
 }
 
-export function addBook(libraryId: string, title: string, author: string) {
+export function addBook(
+  libraryId: string,
+  title: string,
+  author: string,
+  fileName?: string,
+  fileUrl?: string
+) {
   const store = readStore();
   const sourceLibraryId = getSourceLibraryId(store, libraryId);
-  const book = {
+
+  const book: Book = {
     id: createId('book'),
     libraryId: sourceLibraryId,
     title,
     author,
     progress: 0,
+    fileName,
+    fileUrl,
   };
 
   store.books.push(book);
@@ -248,13 +325,40 @@ export function getBook(bookId: string) {
   return readStore().books.find((book) => book.id === bookId) ?? null;
 }
 
+export function searchBooks(query: string): SearchResult[] {
+  const store = readStore();
+  const normalized = query.trim().toLowerCase();
+
+  if (!normalized) {
+    return [];
+  }
+
+  return store.books
+    .filter((book) => {
+      const titleMatch = book.title.toLowerCase().includes(normalized);
+      const authorMatch = book.author.toLowerCase().includes(normalized);
+      const fileMatch = book.fileName?.toLowerCase().includes(normalized) ?? false;
+
+      return titleMatch || authorMatch || fileMatch;
+    })
+    .map((book) => {
+      const library =
+        store.libraries.find(
+          (lib) => (lib.sourceLibraryId ?? lib.id) === book.libraryId
+        ) ?? null;
+
+      return { book, library };
+    });
+}
+
 export function listBookmarks(bookId: string) {
   return readStore().bookmarks.filter((bookmark) => bookmark.bookId === bookId);
 }
 
 export function createBookmark(bookId: string, label: string, location: string) {
   const store = readStore();
-  const bookmark = {
+
+  const bookmark: Bookmark = {
     id: createId('bookmark'),
     bookId,
     label,
@@ -272,7 +376,8 @@ export function listQuotes(bookId: string) {
 
 export function createQuote(bookId: string, text: string, note?: string) {
   const store = readStore();
-  const quote = {
+
+  const quote: Quote = {
     id: createId('quote'),
     bookId,
     text,
@@ -292,7 +397,7 @@ export function createInvite(libraryId: string) {
     throw new Error('Библиотека не найдена.');
   }
 
-  const invite = {
+  const invite: Invite = {
     token: createId('invite'),
     libraryId,
     libraryName: library.name,
@@ -317,7 +422,8 @@ export function findLibraryByCode(code: string) {
     readStore().libraries.find(
       (library) =>
         library.role === 'owner' &&
-        ((library.joinCode ?? '').toUpperCase() === normalized || library.id.toUpperCase() === normalized),
+        (((library.joinCode ?? '').toUpperCase() === normalized) ||
+          library.id.toUpperCase() === normalized)
     ) ?? null
   );
 }
@@ -325,17 +431,25 @@ export function findLibraryByCode(code: string) {
 export function joinLibraryByCode(code: string) {
   const store = readStore();
   const normalized = code.trim().toUpperCase();
+
   const library = store.libraries.find(
     (item) =>
       item.role === 'owner' &&
-      ((item.joinCode ?? '').toUpperCase() === normalized || item.id.toUpperCase() === normalized),
+      (((item.joinCode ?? '').toUpperCase() === normalized) ||
+        item.id.toUpperCase() === normalized)
   );
 
   if (!library) {
     throw new Error('Библиотека с таким ID не найдена.');
   }
 
-  const readerLibrary = ensureReaderLibrary(store, library.id, library.name, library.joinCode);
+  const readerLibrary = ensureReaderLibrary(
+    store,
+    library.id,
+    library.name,
+    library.joinCode
+  );
+
   writeStore(store);
   return readerLibrary;
 }
@@ -348,8 +462,54 @@ export function acceptInvite(token: string) {
     throw new Error('Ссылка-приглашение недействительна.');
   }
 
-  const ownerLibrary = store.libraries.find((library) => library.id === invite.libraryId);
-  ensureReaderLibrary(store, invite.libraryId, invite.libraryName, ownerLibrary?.joinCode);
+  const ownerLibrary = store.libraries.find(
+    (library) => library.id === invite.libraryId
+  );
+
+  ensureReaderLibrary(
+    store,
+    invite.libraryId,
+    invite.libraryName,
+    ownerLibrary?.joinCode
+  );
 
   writeStore(store);
+}
+
+export function updateProfile(name: string, email: string) {
+  const store = readStore();
+
+  if (!store.session) {
+    throw new Error('Сессия не найдена.');
+  }
+
+  const currentUser = store.users.find(
+    (user) => user.id === store.session?.userId
+  );
+
+  if (!currentUser) {
+    throw new Error('Пользователь не найден.');
+  }
+
+  const emailExists = store.users.some(
+    (user) =>
+      user.id !== currentUser.id &&
+      user.email.toLowerCase() === email.toLowerCase()
+  );
+
+  if (emailExists) {
+    throw new Error('Пользователь с таким email уже существует.');
+  }
+
+  currentUser.name = name;
+  currentUser.email = email;
+
+  store.session = {
+    ...store.session,
+    userName: name,
+    email,
+  };
+
+  writeStore(store);
+  return store.session;
 }
