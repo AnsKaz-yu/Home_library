@@ -1,18 +1,18 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { login } from '../lib/mockApi';
+import { getApiBaseUrl, login } from '../lib/mockApi';
 
 export function LoginPage() {
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
 
     try {
-      login(
+      await login(
         String(form.get('email') ?? ''),
         String(form.get('password') ?? '')
       );
@@ -28,7 +28,7 @@ export function LoginPage() {
   }
 
   function handleGoogleLogin() {
-    window.location.href = 'http://localhost:8000/auth/google/login';
+    window.location.href = `${getApiBaseUrl()}/auth/google/login`;
   }
 
   return (

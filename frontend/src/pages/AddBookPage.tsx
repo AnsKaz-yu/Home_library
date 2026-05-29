@@ -1,6 +1,7 @@
 import { ChangeEvent, FormEvent, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { addBook } from '../lib/mockApi';
+import { truncateText } from '../lib/format';
 
 export function AddBookPage() {
   const navigate = useNavigate();
@@ -43,8 +44,8 @@ export function AddBookPage() {
       return;
     }
 
-    if (file.type !== 'application/pdf') {
-      setError('Пожалуйста, выберите PDF-файл.');
+    if (file.type !== 'application/pdf' && file.type !== 'application/epub+zip' && !file.name.endsWith('.epub')) {
+      setError('Пожалуйста, выберите PDF или EPUB файл.');
       return;
     }
 
@@ -52,29 +53,7 @@ export function AddBookPage() {
       setIsSaving(true);
       setError('');
 
-      const formData = new FormData();
-      formData.append('bookFile', file);
-      formData.append('title', title.trim());
-      formData.append('author', author.trim());
-
-      const response = await fetch('http://localhost:8000/api/books/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Ошибка при загрузке книги.');
-      }
-
-      addBook(
-        libraryId,
-        title.trim(),
-        author.trim(),
-        data.fileName,
-        data.fileUrl
-      );
+      await addBook(libraryId, title.trim(), author.trim(), file);
 
       navigate(`/libraries/${libraryId}`);
     } catch (submitError) {
@@ -123,12 +102,12 @@ export function AddBookPage() {
           type="file"
           name="bookFile"
           onChange={handleFileChange}
-          accept=".pdf"
+          accept=".pdf,.epub"
           required
         />
 
         {file ? (
-          <p className="muted-text">Выбранный файл: {file.name}</p>
+          <p className="muted-text" title={file.name}>Выбранный файл: {truncateText(file.name, 42)}</p>
         ) : null}
 
         {error ? <p className="error-message">{error}</p> : null}

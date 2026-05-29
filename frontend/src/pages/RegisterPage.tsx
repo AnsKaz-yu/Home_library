@@ -8,7 +8,7 @@ export function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
 
@@ -23,7 +23,7 @@ export function RegisterPage() {
     }
 
     try {
-      register(name, email, password);
+      await register(name, email, password);
       setError('');
       navigate('/libraries');
     } catch (submitError) {

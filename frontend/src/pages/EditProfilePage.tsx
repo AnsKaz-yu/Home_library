@@ -18,11 +18,11 @@ export function EditProfilePage() {
     );
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     try {
-      updateProfile(name, email);
+      await updateProfile(name, email);
       navigate('/profile');
     } catch (submitError) {
       setError(
@@ -62,12 +62,12 @@ export function EditProfilePage() {
         </label>
 
         <label className="auth-label">
-          <span>Email</span>
+          <span>Эл. почта</span>
           <input
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="Введите email"
+            placeholder="Введите электронную почту"
             required
           />
         </label>

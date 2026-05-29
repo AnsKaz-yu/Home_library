@@ -9,24 +9,34 @@ export function JoinLibraryPage() {
   const [result, setResult] = useState<Library | null>(null);
   const [error, setError] = useState('');
 
-  function handleSearch(event: FormEvent<HTMLFormElement>) {
+  async function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedQuery = query.trim();
-    const library = findLibraryByCode(trimmedQuery);
 
-    if (!library) {
+    try {
+      const library = await findLibraryByCode(trimmedQuery);
+
+      if (!library) {
+        setResult(null);
+        setError('Библиотека не найдена. Проверь ID и попробуй снова.');
+        return;
+      }
+
+      setResult(library);
+      setError('');
+    } catch (searchError) {
       setResult(null);
-      setError('Библиотека не найдена. Проверь ID и попробуй снова.');
-      return;
+      setError(
+        searchError instanceof Error
+          ? searchError.message
+          : 'Не удалось найти библиотеку.'
+      );
     }
-
-    setResult(library);
-    setError('');
   }
 
-  function handleJoin() {
+  async function handleJoin() {
     try {
-      const library = joinLibraryByCode(query.trim());
+      const library = await joinLibraryByCode(query.trim());
       navigate(`/libraries/${library.id}`);
     } catch (joinError) {
       setError(
@@ -44,7 +54,7 @@ export function JoinLibraryPage() {
           <p className="eyebrow">Поиск библиотеки</p>
           <h2>Присоединение по ID</h2>
           <p className="hero-text">
-            Найдите библиотеку по public ID или по invite code и присоединитесь к
+            Найдите библиотеку по публичному ID или по коду приглашения и присоединитесь к
             коллекции как читатель.
           </p>
         </div>
@@ -57,7 +67,7 @@ export function JoinLibraryPage() {
             onChange={(event) => setQuery(event.target.value)}
             required
           />
-          <input value="invite-demo" readOnly aria-label="Пример invite token" />
+          <input value="приглашение-демо" readOnly aria-label="Пример токена приглашения" />
           <button className="primary-button" type="submit">
             Найти библиотеку
           </button>
@@ -72,7 +82,7 @@ export function JoinLibraryPage() {
           </p>
 
           <div className="badge-row">
-  {['FANTASY-001', 'KNOWLEDGE-204', 'invite-demo'].map((code) => (
+          {['FANTASY-001', 'KNOWLEDGE-204', 'приглашение-демо'].map((code) => (
     <span
       key={code}
       className="role-chip clickable-chip"
@@ -97,7 +107,7 @@ export function JoinLibraryPage() {
                 <strong className="join-result-title">{result.name}</strong>
                 <p>{result.description}</p>
                 <p className="muted-text join-muted">
-                  ID: {result.joinCode ?? result.id}
+                  Публичный ID: {result.joinCode ?? result.id}
                 </p>
               </div>
 

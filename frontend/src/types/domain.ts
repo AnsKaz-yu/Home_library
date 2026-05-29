@@ -46,6 +46,7 @@ export interface Quote {
   bookId: string;
   text: string;
   note?: string;
+  location?: string;
 }
 
 export interface Invite {

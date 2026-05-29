@@ -1,16 +1,38 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { acceptInvite, getInvite } from '../lib/mockApi';
+import { Invite } from '../types/domain';
 
 export function InvitePage() {
   const { token = '' } = useParams();
   const navigate = useNavigate();
-  const invite = useMemo(() => getInvite(token), [token]);
+  const [invite, setInvite] = useState<Invite | null>(null);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  function handleAccept() {
+  useEffect(() => {
+    async function loadInvite() {
+      try {
+        setIsLoading(true);
+        setInvite(await getInvite(token));
+        setError('');
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Не удалось загрузить приглашение.'
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    void loadInvite();
+  }, [token]);
+
+  async function handleAccept() {
     try {
-      acceptInvite(token);
+      await acceptInvite(token);
       navigate('/libraries');
     } catch (submitError) {
       setError(
@@ -19,6 +41,16 @@ export function InvitePage() {
           : 'Не удалось принять приглашение.'
       );
     }
+  }
+
+  if (isLoading) {
+    return (
+      <main className="invite-page">
+        <section className="invite-card">
+          <p className="invite-text">Загрузка приглашения...</p>
+        </section>
+      </main>
+    );
   }
 
   if (!invite) {

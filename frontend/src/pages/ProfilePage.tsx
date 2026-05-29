@@ -42,7 +42,7 @@ export function ProfilePage() {
         </article>
 
         <article className="content-card stack">
-          <p className="eyebrow">Email</p>
+          <p className="eyebrow">Эл. почта</p>
           <h3>{session.email}</h3>
           <p className="muted-text">Электронная почта, связанная с аккаунтом.</p>
         </article>

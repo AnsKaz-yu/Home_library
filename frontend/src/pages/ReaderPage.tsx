@@ -1,66 +1,81 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  createBookmark,
-  createQuote,
   getBook,
   listBookmarks,
   listQuotes,
 } from '../lib/mockApi';
+import { truncateText } from '../lib/format';
+import { Book, Bookmark, Quote } from '../types/domain';
 
 export function ReaderPage() {
   const { libraryId = '', bookId = '' } = useParams();
-  const book = useMemo(() => getBook(bookId), [bookId]);
-  const [bookmarks, setBookmarks] = useState(() => listBookmarks(bookId));
-  const [quotes, setQuotes] = useState(() => listQuotes(bookId));
+  const [book, setBook] = useState<Book | null>(null);
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadReaderPage() {
+      try {
+        setIsLoading(true);
+        const [loadedBook, loadedBookmarks, loadedQuotes] = await Promise.all([
+          getBook(bookId),
+          listBookmarks(bookId),
+          listQuotes(bookId),
+        ]);
+
+        setBook(loadedBook);
+        setBookmarks(loadedBookmarks);
+        setQuotes(loadedQuotes);
+        setProgress(loadedBook?.progress ?? 0);
+        setError('');
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Не удалось загрузить книгу.'
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    void loadReaderPage();
+  }, [bookId]);
+
+  if (isLoading) {
+    return (
+      <section className="content-card">
+        <h2>Загрузка книги...</h2>
+      </section>
+    );
+  }
 
   if (!book) {
     return (
       <section className="content-card">
         <h2>Книга не найдена</h2>
+        {error ? <p className="muted-text">{error}</p> : null}
       </section>
     );
   }
 
-  function handleBookmarkSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-
-    createBookmark(
-      bookId,
-      String(form.get('label') ?? ''),
-      String(form.get('location') ?? '')
-    );
-
-    setBookmarks(listBookmarks(bookId));
-    event.currentTarget.reset();
-  }
-
-  function handleQuoteSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-
-    createQuote(
-      bookId,
-      String(form.get('text') ?? ''),
-      String(form.get('note') ?? '')
-    );
-
-    setQuotes(listQuotes(bookId));
-    event.currentTarget.reset();
-  }
-
   async function handleDownload() {
-    if (!book.fileUrl) return;
+    const currentBook = book;
+
+    if (!currentBook?.fileUrl) return;
 
     try {
-      const response = await fetch(book.fileUrl);
+      const response = await fetch(currentBook.fileUrl);
       const blob = await response.blob();
       const objectUrl = window.URL.createObjectURL(blob);
 
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = book.fileName || `${book.title}.pdf`;
+      link.download = currentBook.fileName || `${currentBook.title}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -76,7 +91,7 @@ export function ReaderPage() {
     <section className="reader-page-modern">
       <div className="reader-page-modern__topbar">
         <Link className="reader-back-button" to={`/libraries/${libraryId}`}>
-          ← Back
+          ← Назад
         </Link>
       </div>
 
@@ -85,7 +100,7 @@ export function ReaderPage() {
           <div className="reader-book-summary-card">
             <div className="reader-book-summary-card__cover">
               <div className="reader-book-summary-card__cover-badge">
-                Home Library Edition
+                Издание Home Library
               </div>
               <div className="reader-book-summary-card__cover-title">
                 {book.title}
@@ -97,8 +112,8 @@ export function ReaderPage() {
               <p>{book.author}</p>
 
               {book.fileName ? (
-                <p className="reader-book-summary-card__file">
-                  Файл: {book.fileName}
+                <p className="reader-book-summary-card__file" title={book.fileName}>
+                  Файл: {truncateText(book.fileName, 42)}
                 </p>
               ) : (
                 <p className="reader-book-summary-card__file">
@@ -111,17 +126,9 @@ export function ReaderPage() {
           <section className="content-card stack">
             <h3>Закладки</h3>
 
-            <form className="stack" onSubmit={handleBookmarkSubmit}>
-              <input name="label" placeholder="Название закладки" required />
-              <input
-                name="location"
-                placeholder="Позиция, например Page 18"
-                required
-              />
-              <button className="primary-button" type="submit">
-                Добавить
-              </button>
-            </form>
+            <p className="muted-text">
+              Закладки создаются из просмотрщика книги.
+            </p>
 
             {bookmarks.length > 0 ? (
               bookmarks.map((bookmark) => (
@@ -137,13 +144,9 @@ export function ReaderPage() {
           <section className="content-card stack">
             <h3>Цитаты</h3>
 
-            <form className="stack" onSubmit={handleQuoteSubmit}>
-              <textarea name="text" placeholder="Текст цитаты" rows={4} required />
-              <input name="note" placeholder="Комментарий" />
-              <button className="primary-button" type="submit">
-                Сохранить цитату
-              </button>
-            </form>
+            <p className="muted-text">
+              Цитаты создаются из просмотрщика книги через выделение текста.
+            </p>
 
             {quotes.length > 0 ? (
               quotes.map((quote) => (
@@ -156,30 +159,49 @@ export function ReaderPage() {
               <p className="muted-text">Пока нет сохранённых цитат.</p>
             )}
           </section>
+
+          {error ? <p className="error-message">{error}</p> : null}
         </aside>
 
         <main className="reader-page-modern__content">
           <div className="reader-stats-row">
             <div className="reader-stat-card">
-              <span className="reader-stat-card__label">Progress</span>
-              <strong>{book.progress}%</strong>
+              <span className="reader-stat-card__label">Прогресс</span>
+              <strong>{progress}%</strong>
             </div>
 
             <div className="reader-stat-card">
-              <span className="reader-stat-card__label">Status</span>
-              <strong>{book.progress > 0 ? 'В процессе' : 'Не начато'}</strong>
+              <span className="reader-stat-card__label">Статус</span>
+              <strong>{progress > 0 ? 'В процессе' : 'Не начато'}</strong>
             </div>
 
             <div className="reader-stat-card">
-              <span className="reader-stat-card__label">Bookmarks</span>
+              <span className="reader-stat-card__label">Закладки</span>
               <strong>{bookmarks.length}</strong>
             </div>
 
             <div className="reader-stat-card">
-              <span className="reader-stat-card__label">Quotes</span>
+              <span className="reader-stat-card__label">Цитаты</span>
               <strong>{quotes.length}</strong>
             </div>
           </div>
+
+          <section className="content-card stack" style={{ marginBottom: '24px' }}>
+            <h3>Прогресс чтения</h3>
+            <div
+              className="reader-progress-meter"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+              aria-label="Прогресс чтения"
+            >
+              <div className="reader-progress-meter__fill" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="muted-text">
+              Текущее значение: {progress}% · Обновляется автоматически во время чтения в просмотрщике
+            </p>
+          </section>
 
           <div className="reader-actions-row">
             {book.fileUrl ? (
@@ -188,7 +210,7 @@ export function ReaderPage() {
                   className="reader-main-action reader-main-action--primary"
                   to={`/reader/${libraryId}/${bookId}/view`}
                 >
-                  Read Online
+                  Читать онлайн
                 </Link>
 
                 <button
@@ -196,7 +218,7 @@ export function ReaderPage() {
                   className="reader-main-action reader-main-action--secondary"
                   onClick={handleDownload}
                 >
-                  Download
+                  Скачать
                 </button>
               </>
             ) : (

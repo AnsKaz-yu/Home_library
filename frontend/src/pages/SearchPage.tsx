@@ -1,13 +1,41 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { searchBooks } from '../lib/mockApi';
+import { SearchResult, searchBooks } from '../lib/mockApi';
+import { truncateText } from '../lib/format';
 
 export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get('q') ?? '';
   const [query, setQuery] = useState(initialQuery);
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const results = useMemo(() => searchBooks(initialQuery), [initialQuery]);
+  useEffect(() => {
+    async function runSearch() {
+      if (!initialQuery) {
+        setResults([]);
+        setError('');
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setResults(await searchBooks(initialQuery));
+        setError('');
+      } catch (searchError) {
+        setError(
+          searchError instanceof Error
+            ? searchError.message
+            : 'Не удалось выполнить поиск.'
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    void runSearch();
+  }, [initialQuery]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,7 +80,16 @@ export function SearchPage() {
             <p className="muted-text">{results.length} найдено</p>
           </div>
 
-          {results.length > 0 ? (
+          {error ? (
+            <div className="content-card empty-state-card">
+              <h3>Ошибка поиска</h3>
+              <p className="muted-text">{error}</p>
+            </div>
+          ) : isLoading ? (
+            <div className="content-card empty-state-card">
+              <p className="muted-text">Ищем книги...</p>
+            </div>
+          ) : results.length > 0 ? (
             <div className="card-grid">
               {results.map(({ book, library }) => (
                 <article className="content-card library-card" key={book.id}>
@@ -68,7 +105,7 @@ export function SearchPage() {
                   ) : null}
 
                   {book.fileName ? (
-                    <p className="muted-text">Файл: {book.fileName}</p>
+                    <p className="muted-text" title={book.fileName}>Файл: {truncateText(book.fileName, 34)}</p>
                   ) : null}
 
                   <div className="stack-small">

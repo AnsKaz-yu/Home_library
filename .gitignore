@@ -13,3 +13,5 @@ __pycache__/
 .pytest_cache/
 *.md
 figma/
+*.tsbuildinfo
+backend/home_library.db

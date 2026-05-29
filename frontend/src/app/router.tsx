@@ -59,7 +59,7 @@ function AppShell() {
               <h1 className="topbar-title">Home Library</h1>
             </Link>
 
-            <p className="topbar-subtitle">Your personal reading system</p>
+            <p className="topbar-subtitle">Ваша личная система чтения</p>
           </div>
 
           {session && (
@@ -67,13 +67,13 @@ function AppShell() {
               <div className="topbar-search-wrap">
                 <input
                   type="text"
-                  placeholder="Search books, authors, files..."
+                  placeholder="Поиск книг, авторов и файлов..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="topbar-search-input"
                 />
                 <button type="submit" className="topbar-search-button">
-                  Search
+                  Найти
                 </button>
               </div>
             </form>
@@ -88,8 +88,8 @@ function AppShell() {
 
                 <button
                   className="secondary-button"
-                  onClick={() => {
-                    logout();
+                  onClick={async () => {
+                    await logout();
                     window.location.href = '/login';
                   }}
                 >

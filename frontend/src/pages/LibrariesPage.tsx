@@ -1,11 +1,18 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createLibrary, listLibraries } from '../lib/mockApi';
+import { Library } from '../types/domain';
 
 export function LibrariesPage() {
   const navigate = useNavigate();
-  const [libraries, setLibraries] = useState(() => listLibraries());
+  const [libraries, setLibraries] = useState<Library[]>([]);
   const [searchId, setSearchId] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    void refreshLibraries();
+  }, []);
 
   const ownerLibraries = useMemo(
     () => libraries.filter((library) => library.role === 'owner'),
@@ -17,8 +24,20 @@ export function LibrariesPage() {
     [libraries]
   );
 
-  function refreshLibraries() {
-    setLibraries(listLibraries());
+  async function refreshLibraries() {
+    try {
+      setIsLoading(true);
+      setLibraries(await listLibraries());
+      setError('');
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Не удалось загрузить библиотеки.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   function handleSearch() {
@@ -27,17 +46,25 @@ export function LibrariesPage() {
     navigate(`/join?code=${encodeURIComponent(normalized)}`);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
 
-    createLibrary(
-      String(form.get('name') ?? ''),
-      String(form.get('description') ?? '')
-    );
+    try {
+      await createLibrary(
+        String(form.get('name') ?? ''),
+        String(form.get('description') ?? '')
+      );
 
-    refreshLibraries();
-    event.currentTarget.reset();
+      await refreshLibraries();
+      event.currentTarget.reset();
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : 'Не удалось создать библиотеку.'
+      );
+    }
   }
 
   function renderLibraryCard(
@@ -118,6 +145,13 @@ export function LibrariesPage() {
         </form>
       </div>
 
+      {error ? (
+        <section className="content-card empty-state-card">
+          <h3>Ошибка загрузки</h3>
+          <p className="muted-text">{error}</p>
+        </section>
+      ) : null}
+
       <div className="content-card stack">
         <div className="space-between">
           <div>
@@ -168,7 +202,11 @@ export function LibrariesPage() {
           <p className="muted-text">{ownerLibraries.length} библиотек</p>
         </div>
 
-        {ownerLibraries.length > 0 ? (
+        {isLoading ? (
+          <div className="content-card empty-state-card">
+            <p className="muted-text">Загрузка библиотек...</p>
+          </div>
+        ) : ownerLibraries.length > 0 ? (
           <div className="card-grid">
             {ownerLibraries.map(renderLibraryCard)}
           </div>
@@ -188,7 +226,11 @@ export function LibrariesPage() {
           <p className="muted-text">{readerLibraries.length} библиотек</p>
         </div>
 
-        {readerLibraries.length > 0 ? (
+        {isLoading ? (
+          <div className="content-card empty-state-card">
+            <p className="muted-text">Загрузка библиотек...</p>
+          </div>
+        ) : readerLibraries.length > 0 ? (
           <div className="card-grid">
             {readerLibraries.map(renderLibraryCard)}
           </div>
